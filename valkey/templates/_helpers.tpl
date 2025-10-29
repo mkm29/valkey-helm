@@ -77,3 +77,27 @@ Creating Image Pull Secrets
 {{- printf "%s-regcred" .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
+
+{{/*
+Determine the number of replicas for standalone mode
+Priority: valkey.replicaCount > global replicaCount
+*/}}
+{{- define "standalone.replicaCount" -}}
+{{- if .Values.valkey.replicaCount }}
+{{- .Values.valkey.replicaCount }}
+{{- else }}
+{{- .Values.replicaCount }}
+{{- end }}
+{{- end }}
+
+{{/*
+Determine the number of replicas for sentinel mode
+Priority: sentinel.replicaCount > global replicaCount
+*/}}
+{{- define "sentinel.replicaCount" -}}
+{{- if .Values.sentinel.replicaCount }}
+{{- .Values.sentinel.replicaCount }}
+{{- else }}
+{{- .Values.replicaCount }}
+{{- end }}
+{{- end }}

@@ -43,7 +43,7 @@ data:
       echo "dir /data"
     } >>"$VALKEY_CONFIG"
 
-    {{- if .Values.auth.enabled }}
+    {{- if .Values.valkey.auth.enabled }}
     echo "aclfile /data/conf/users.acl" >>"$VALKEY_CONFIG"
     cat <<EOF > /data/conf/users.acl
 {{ .Values.auth.aclConfig | indent 6 }}
@@ -55,8 +55,8 @@ data:
       log "Appending /usr/local/etc/valkey/valkey.conf"
       cat /usr/local/etc/valkey/valkey.conf >>"$VALKEY_CONFIG"
     fi
-    if [ -d /extravalkeyconfigs ]; then
-      log "Appending files in /extravalkeyconfigs/"
-      cat /extravalkeyconfigs/* >>"$VALKEY_CONFIG"
+    if [ -d /extraconfig.valkeys ]; then
+      log "Appending files in /extraconfig.valkeys/"
+      cat /extraconfig.valkeys/* >>"$VALKEY_CONFIG"
     fi
 

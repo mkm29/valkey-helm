@@ -1,3 +1,4 @@
+{{- if eq .Values.config.mode "standalone" -}}
 {{- $fullname := include "valkey.fullname" . }}
 {{- $storage := .Values.dataStorage }}
 {{- $createPVC := and $storage.enabled (not (empty $storage.requestedSize)) (empty $storage.persistentVolumeClaimName) }}
@@ -8,7 +9,7 @@ metadata:
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ include "standalone.replicaCount" . }}
   strategy:
     type: {{ .Values.deploymentStrategy }}
   selector:
@@ -35,7 +36,7 @@ spec:
       serviceAccountName: {{ include "valkey.serviceAccountName" . }}
       securityContext:
       {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      
+
       initContainers:
         - name: {{ .Chart.Name }}-init
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -53,16 +54,16 @@ spec:
               {{- end }}
             - name: scripts
               mountPath: /scripts
-            {{- if .Values.valkeyConfig }}
+            {{- if .Values.config.valkey }}
             - name: valkey-config
               mountPath: /usr/local/etc/valkey/valkey.conf
               subPath: valkey.conf
             {{- end }}
-            {{- if .Values.extraSecretValkeyConfigs }}
-            - name: extravalkeyconfigs-volume
-              mountPath: /extravalkeyconfigs
+            {{- if .Values.valkey.extraSecrets }}
+            - name: extraconfig.valkeys-volume
+              mountPath: /extraconfig.valkeys
             {{- end }}
-          {{- with .Values.initResources }}
+          {{- with .Values.valkey.initResources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -84,7 +85,7 @@ spec:
               value: "{{ $val }}"
             {{- end }}
             - name: VALKEY_LOGLEVEL
-              value: "{{ .Values.valkeyLogLevel }}"
+              value: "{{ .Values.config.logLevel }}"
           ports:
             - name: tcp
               containerPort: {{ .Values.service.port }}
@@ -96,15 +97,15 @@ spec:
             exec:
               command: [ "sh", "-c", "valkey-cli ping" ]
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.valkey.resources | nindent 12 }}
           volumeMounts:
             - name: {{ .Values.dataStorage.volumeName }}
               mountPath: /data
-            {{- range $secret := .Values.extraValkeySecrets }}
+            {{- range $secret := .Values.valkey.extraSecrets }}
             - name: {{ $secret.name }}-valkey
               mountPath: {{ $secret.mountPath }}
             {{- end }}
-            {{- range $config := .Values.extraValkeyConfigs }}
+            {{- range $config := .Values.valkey.extraConfigs }}
             - name: {{ $config.name }}-valkey
               mountPath: {{ $config.mountPath }}
             {{- end }}
@@ -158,18 +159,18 @@ spec:
           configMap:
             name: {{ include "valkey.fullname" . }}-init-scripts
             defaultMode: 0555
-        {{- if .Values.valkeyConfig }}
+        {{- if .Values.config.valkey }}
         - name: valkey-config
           configMap:
             name: {{ include "valkey.fullname" . }}-config
         {{- end }}
-        {{- range .Values.extraValkeySecrets }}
+        {{- range .Values.valkey.extraSecrets }}
         - name: {{ .name }}-valkey
           secret:
             secretName: {{ .name }}
             defaultMode: {{ .defaultMode | default 0440 }}
         {{- end }}
-        {{- range .Values.extraValkeyConfigs }}
+        {{- range .Values.valkey.extraConfigs }}
         - name: {{ .name }}-valkey
           configMap:
             name: {{ .name }}
@@ -204,3 +205,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end -}}

@@ -34,7 +34,7 @@ Port:         {{ .Values.service.port }}
    $ valkey-cli -h $NODE_IP -p $NODE_PORT PING
 {{ end }}
 
-{{ if .Values.auth.enabled }}
+{{ if .Values.valkey.auth.enabled }}
 🔐 Authentication is ENABLED (ACL)
 - Provide the username and password from `.auth.aclConfig`.
 - Default user:
@@ -47,7 +47,7 @@ Port:         {{ .Values.service.port }}
 {{ end }}
 
 ✅ Quick test
-$ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }}{{ if .Values.auth.enabled }} --user <user> -a <password>{{ end }}
+$ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }}{{ if .Values.valkey.auth.enabled }} --user <user> -a <password>{{ end }}
 valkey> SET foo bar
 valkey> GET foo
 "bar"
