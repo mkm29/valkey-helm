@@ -370,10 +370,8 @@ For both modes, monitor these key metrics:
 
 - Enable ACLs (Access Control Lists) for authentication
 - Use TLS/SSL for encrypted connections
-- Configure `requirepass` for password protection
-- Restrict network access via firewalls/security groups
+- Do not support legacy `requirepass` for password protection
 - Disable dangerous commands (`FLUSHALL`, `CONFIG`, etc.)
-- Regular security updates and patching
 
 ______________________________________________________________________
 
