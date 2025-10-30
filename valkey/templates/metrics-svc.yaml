@@ -1,4 +1,4 @@
-{{- if and .Values.metrics.enabled .Values.metrics.service.enabled }}
+{{- if and .Values.valkey.metrics.enabled .Values.valkey.metrics.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,18 +7,18 @@ metadata:
     {{- include "valkey.labels" . | nindent 4 }}
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: valkey
-    {{- with .Values.metrics.service.extraLabels }}
+    {{- with .Values.valkey.metrics.service.extraLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
   annotations:
-    {{- with .Values.metrics.service.annotations }}
+    {{- with .Values.valkey.metrics.service.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  type: {{ .Values.metrics.service.type }}
+  type: {{ .Values.valkey.metrics.service.type }}
   ports:
     - name: metrics
-      port: {{ .Values.metrics.service.ports.http }}
+      port: {{ .Values.valkey.metrics.service.ports.http }}
       protocol: TCP
       targetPort: metrics
   selector:

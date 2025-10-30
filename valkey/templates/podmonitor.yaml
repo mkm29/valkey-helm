@@ -1,4 +1,4 @@
-{{- if and .Values.metrics.enabled .Values.metrics.podMonitor.enabled }}
+{{- if and .Values.valkey.metrics.enabled .Values.valkey.metrics.podMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -7,41 +7,41 @@ metadata:
     {{- include "valkey.labels" . | nindent 4 }}
     app.kubernetes.io/part-of: valkey
     app.kubernetes.io/component: podmonitor
-    {{- with .Values.metrics.podMonitor.extraLabels }}
+    {{- with .Values.valkey.metrics.podMonitor.extraLabels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.metrics.podMonitor.annotations }}
+  {{- with .Values.valkey.metrics.podMonitor.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
   podMetricsEndpoints:
-    - port: {{ .Values.metrics.podMonitor.port }}
-      {{- with .Values.metrics.podMonitor.interval }}
+    - port: {{ .Values.valkey.metrics.podMonitor.port }}
+      {{- with .Values.valkey.metrics.podMonitor.interval }}
       interval: {{ . }}
       {{- end }}
-      {{- with .Values.metrics.podMonitor.scrapeTimeout }}
+      {{- with .Values.valkey.metrics.podMonitor.scrapeTimeout }}
       scrapeTimeout: {{ . }}
       {{- end }}
-      {{- with .Values.metrics.podMonitor.honorLabels }}
+      {{- with .Values.valkey.metrics.podMonitor.honorLabels }}
       honorLabels: {{ . }}
       {{- end }}
-      {{- with .Values.metrics.podMonitor.relabelings }}
+      {{- with .Values.valkey.metrics.podMonitor.relabelings }}
       relabelings:
         {{- toYaml . | nindent 6 }}
       {{- end }}
-      {{- with .Values.metrics.podMonitor.metricRelabelings }}
+      {{- with .Values.valkey.metrics.podMonitor.metricRelabelings }}
       metricRelabelings:
         {{- toYaml . | nindent 6 }}
       {{- end }}
-  {{- with .Values.metrics.podMonitor.podTargetLabels }}
+  {{- with .Values.valkey.metrics.podMonitor.podTargetLabels }}
   podTargetLabels:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .Values.metrics.podMonitor.sampleLimit -}}
+  {{- with .Values.valkey.metrics.podMonitor.sampleLimit -}}
   sampleLimit: {{ . }}
   {{- end }}
-  {{- with .Values.metrics.podMonitor.targetLimit -}}
+  {{- with .Values.valkey.metrics.podMonitor.targetLimit -}}
   targetLimit: {{ . }}
   {{- end }}
   namespaceSelector:

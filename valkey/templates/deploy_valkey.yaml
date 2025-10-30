@@ -109,25 +109,25 @@ spec:
             - name: {{ $config.name }}-valkey
               mountPath: {{ $config.mountPath }}
             {{- end }}
-        {{- if .Values.metrics.enabled }}
+        {{- if .Values.valkey.metrics.enabled }}
         - name: metrics
-          image: "{{ .Values.metrics.exporter.image.repository }}:{{ .Values.metrics.exporter.image.tag }}"
-          imagePullPolicy: {{ .Values.metrics.exporter.image.pullPolicy | quote }}
-          {{- with .Values.metrics.exporter.securityContext }}
+          image: "{{ .Values.valkey.metrics.exporter.image.repository }}:{{ .Values.valkey.metrics.exporter.image.tag }}"
+          imagePullPolicy: {{ .Values.valkey.metrics.exporter.image.pullPolicy | quote }}
+          {{- with .Values.valkey.metrics.exporter.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.metrics.exporter.command }}
+          {{- with .Values.valkey.metrics.exporter.command }}
           command:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.metrics.exporter.args }}
+          {{- with .Values.valkey.metrics.exporter.args }}
           args:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
             - name: metrics
-              containerPort: {{ .Values.metrics.exporter.port }}
+              containerPort: {{ .Values.valkey.metrics.exporter.port }}
           startupProbe:
             tcpSocket:
               port: metrics
@@ -138,18 +138,18 @@ spec:
             httpGet:
               path: /
               port: metrics
-          {{- with .Values.metrics.exporter.resources }}
+          {{- with .Values.valkey.metrics.exporter.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.metrics.exporter.extraVolumeMounts }}
+          {{- with .Values.valkey.metrics.exporter.extraVolumeMounts }}
           volumeMounts:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
             - name: REDIS_ALIAS
               value: {{ include "valkey.fullname" . }}
-            {{- range $key, $val := .Values.metrics.exporter.extraEnvs }}
+            {{- range $key, $val := .Values.valkey.metrics.exporter.extraEnvs }}
             - name: {{ $key }}
               value: "{{ $val }}"
             {{- end }}

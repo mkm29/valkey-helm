@@ -1,537 +1,1025 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-        "global": {
-            "type": "object",
-            "description": "Globally shared configuration"
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "description": "Globally shared configuration"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of Valkey/Sentinel pods to run (must be at least 3 if using sentinel mode)"
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "Valkey Docker image to use"
         },
-        "replicaCount": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Number of Valkey/Sentinel pods to run (must be at least 3 if using sentinel mode)"
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ],
+          "description": "Image pull policy (Always, IfNotPresent, Never)"
         },
-        "image": {
-            "type": "object",
-            "properties": {
-                "repository": {
-                    "type": "string",
-                    "description": "Valkey Docker image to use"
-                },
-                "pullPolicy": {
-                    "type": "string",
-                    "enum": ["Always", "IfNotPresent", "Never"],
-                    "description": "Image pull policy (Always, IfNotPresent, Never)"
-                },
-                "tag": {
-                    "type": "string",
-                    "description": "Image tag (leave empty to use .Chart.AppVersion)"
-                }
-            }
+        "tag": {
+          "type": "string",
+          "description": "Image tag (leave empty to use .Chart.AppVersion)"
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "Secrets with credentials to pull images from a private registry"
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "standalone",
+            "sentinel"
+          ],
+          "description": "Deployment mode, possible values: standalone, sentinel"
         },
-        "imagePullSecrets": {
-            "type": "array",
-            "description": "Secrets with credentials to pull images from a private registry"
-        },
-        "config": {
-            "type": "object",
-            "properties": {
-                "mode": {
-                    "type": "string",
-                    "enum": ["standalone", "sentinel"],
-                    "description": "Deployment mode, possible values: standalone, sentinel"
-                },
-                "logLevel": {
-                    "type": "string",
-                    "enum": ["debug", "verbose", "notice", "warning"],
-                    "description": "Valkey logging level: debug, verbose, notice, warning"
-                },
-                "valkey": {
-                    "type": "string",
-                    "description": "Content for valkey.conf (will be mounted via ConfigMap)"
-                },
-                "sentinel": {
-                    "type": "string",
-                    "description": "Content for sentinel.conf (used only if mode is sentinel)"
-                }
-            }
+        "logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "verbose",
+            "notice",
+            "warning"
+          ],
+          "description": "Valkey logging level: debug, verbose, notice, warning"
         },
         "valkey": {
-            "type": "object",
-            "properties": {
-                "networkPolicy": {
-                    "type": "object",
-                    "description": "Network policy to control traffic to/from the Valkey pods"
-                },
-                "resources": {
-                    "type": "object",
-                    "description": "Resource limits/requests for the main Valkey container"
-                },
-                "initResources": {
-                    "type": "object",
-                    "description": "Resource limits/requests for init containers"
-                },
-                "auth": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "description": "Enable ACL-based authentication"
-                        },
-                        "password": {
-                            "type": "string",
-                            "description": "Authentication password"
-                        },
-                        "existingSecret": {
-                            "type": "string",
-                            "description": "Existing secret containing password"
-                        },
-                        "existingSecretPasswordKey": {
-                            "type": "string",
-                            "description": "Key in existing secret containing password"
-                        },
-                        "aclConfig": {
-                            "type": "string",
-                            "description": "Default ACL rules (used only if auth.enabled is true)"
-                        }
-                    }
-                },
-                "extraSecrets": {
-                    "type": "array",
-                    "description": "Mount additional secrets into the Valkey container"
-                },
-                "extraConfigs": {
-                    "type": "array",
-                    "description": "Mount additional configMaps into the Valkey container"
-                }
-            }
+          "type": "string",
+          "description": "Content for valkey.conf (will be mounted via ConfigMap)"
         },
         "sentinel": {
-            "type": "object",
-            "properties": {
-                "port": {
-                    "type": "integer",
-                    "description": "Sentinel port"
-                },
-                "quorum": {
-                    "type": "integer",
-                    "minimum": 2,
-                    "description": "Quorum: number of Sentinels that must agree primary is down"
-                },
-                "downAfterMilliseconds": {
-                    "type": "integer",
-                    "description": "Time before instance considered down (milliseconds)"
-                },
-                "failoverTimeout": {
-                    "type": "integer",
-                    "description": "Failover timeout in milliseconds"
-                },
-                "parallelSyncs": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "description": "Number of replicas syncing simultaneously during failover"
-                },
-                "auth": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "description": "Enable Sentinel authentication"
-                        },
-                        "password": {
-                            "type": "string",
-                            "description": "Sentinel authentication password"
-                        },
-                        "existingSecret": {
-                            "type": "string",
-                            "description": "Existing secret containing Sentinel password"
-                        },
-                        "existingSecretPasswordKey": {
-                            "type": "string",
-                            "description": "Key in existing secret containing Sentinel password"
-                        }
-                    }
-                },
-                "announce": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean",
-                            "description": "Enable announce configuration"
-                        }
-                    }
-                },
-                "networkPolicy": {
-                    "type": "object",
-                    "description": "Network policy to control traffic to/from the Sentinel pods"
-                },
-                "resources": {
-                    "type": "object",
-                    "description": "Resource limits/requests for the Sentinel container"
-                },
-                "extraSecrets": {
-                    "type": "array",
-                    "description": "Mount additional secrets into the Sentinel container"
-                },
-                "extraConfigs": {
-                    "type": "array",
-                    "description": "Mount additional configMaps into the Sentinel container"
-                }
-            }
+          "type": "string",
+          "description": "Content for sentinel.conf (used only if mode is sentinel)"
+        }
+      }
+    },
+    "valkey": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of Valkey pods to run (overrides global replicaCount for Valkey)"
         },
-        "nameOverride": {
-            "type": "string",
-            "description": "Override the default name of resources"
+        "resources": {
+          "type": "object",
+          "description": "Resource limits/requests for the main Valkey container"
         },
-        "fullnameOverride": {
-            "type": "string",
-            "description": "Override the full name of resources"
+        "initResources": {
+          "type": "object",
+          "description": "Resource limits/requests for init containers"
         },
-        "serviceAccount": {
-            "type": "object",
-            "properties": {
-                "create": {
-                    "type": "boolean",
-                    "description": "Create a service account for Valkey"
-                },
-                "automount": {
-                    "type": "boolean",
-                    "description": "Whether to automount the service account token"
-                },
-                "annotations": {
-                    "type": "object",
-                    "description": "Annotations to add to the service account"
-                },
-                "name": {
-                    "type": "string",
-                    "description": "Name of an existing service account to use (if create: false)"
-                }
-            }
+        "extraSecrets": {
+          "type": "array",
+          "description": "Mount additional secrets into the Valkey container"
         },
-        "podAnnotations": {
-            "type": "object",
-            "description": "Annotations for the pods"
-        },
-        "podLabels": {
-            "type": "object",
-            "description": "Labels for the pods"
-        },
-        "podSecurityContext": {
-            "type": "object",
-            "properties": {
-                "fsGroup": {
-                    "type": "integer",
-                    "description": "File system group ID"
-                },
-                "runAsUser": {
-                    "type": "integer",
-                    "description": "User ID to run containers as"
-                },
-                "runAsGroup": {
-                    "type": "integer",
-                    "description": "Group ID to run containers as"
-                }
-            },
-            "description": "Security context for the pod (applies to all containers)"
-        },
-        "securityContext": {
-            "type": "object",
-            "properties": {
-                "capabilities": {
-                    "type": "object",
-                    "properties": {
-                        "drop": {
-                            "type": "array",
-                            "items": {
-                                "type": "string"
-                            },
-                            "description": "Capabilities to drop"
-                        }
-                    }
-                },
-                "readOnlyRootFilesystem": {
-                    "type": "boolean",
-                    "description": "Mount root filesystem as read-only"
-                },
-                "runAsNonRoot": {
-                    "type": "boolean",
-                    "description": "Run as non-root user"
-                },
-                "runAsUser": {
-                    "type": "integer",
-                    "description": "User ID to run container as"
-                }
-            },
-            "description": "Security context for the Valkey containers"
-        },
-        "service": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
-                    "description": "Type of Kubernetes service (ClusterIP, NodePort, LoadBalancer)"
-                },
-                "port": {
-                    "type": "integer",
-                    "description": "Port on which Valkey will be exposed"
-                },
-                "annotations": {
-                    "type": "object",
-                    "description": "Annotations for the service"
-                },
-                "nodePort": {
-                    "type": "integer",
-                    "description": "NodePort value (if service.type is NodePort)"
-                }
-            }
-        },
-        "dataStorage": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "description": "Enable persistent volume claim creation"
-                },
-                "persistentVolumeClaimName": {
-                    "type": "string",
-                    "description": "Use existing PVC by name (skip dynamic provisioning if set)"
-                },
-                "subPath": {
-                    "type": "string",
-                    "description": "Subpath inside PVC to mount"
-                },
-                "volumeName": {
-                    "type": "string",
-                    "description": "Name of the volume (referenced in deployment)"
-                },
-                "requestedSize": {
-                    "type": "string",
-                    "description": "Request size (e.g. 5Gi) for dynamically provisioned volume"
-                },
-                "className": {
-                    "type": "string",
-                    "description": "Name of the storage class to use"
-                },
-                "accessModes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "description": "Access modes for the PVC (e.g., ReadWriteOnce, ReadWriteMany)"
-                },
-                "keepPvc": {
-                    "type": "boolean",
-                    "description": "If true, keep the PVC on Helm uninstall"
-                },
-                "annotations": {
-                    "type": "object",
-                    "description": "Optional annotations to add to the PVC"
-                },
-                "labels": {
-                    "type": "object",
-                    "description": "Optional labels to add to the PVC"
-                }
-            }
-        },
-        "extraStorage": {
-            "type": "array",
-            "description": "Mount additional emptyDir or hostPath volumes (advanced use)"
-        },
-        "nodeSelector": {
-            "type": "object",
-            "description": "Node selector for pod assignment"
-        },
-        "tolerations": {
-            "type": "array",
-            "description": "Tolerations for pod assignment to tainted nodes"
-        },
-        "affinity": {
-            "type": "object",
-            "description": "Affinity rules for pod scheduling"
-        },
-        "deploymentStrategy": {
-            "type": "string",
-            "enum": ["RollingUpdate", "Recreate"],
-            "description": "Set Deployment strategy"
-        },
-        "topologySpreadConstraints": {
-            "type": "array",
-            "items": {
-                "type": "object"
-            },
-            "description": "Topology spread constraints for pod scheduling"
+        "extraConfigs": {
+          "type": "array",
+          "description": "Mount additional configMaps into the Valkey container"
         },
         "metrics": {
-            "type": "object",
-            "properties": {
-                "enabled": {
-                    "type": "boolean",
-                    "description": "Enable Prometheus exporter sidecar"
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable Prometheus exporter sidecar"
+            },
+            "exporter": {
+              "type": "object",
+              "description": "Exporter configuration",
+              "properties": {
+                "command": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Command to run in the metrics exporter container (overrides args)"
                 },
-                "exporter": {
-                    "type": "object",
-                    "properties": {
-                        "extraExporterSecrets": {
-                            "type": "array",
-                            "description": "Additional secrets to mount for metrics exporter"
-                        },
-                        "command": {
-                            "type": "array"
-                        },
-                        "args": {
-                            "type": "array"
-                        },
-                        "port": {
-                            "type": "integer"
-                        },
-                        "image": {
-                            "type": "object"
-                        },
-                        "resources": {
-                            "type": "object"
-                        },
-                        "extraVolumeMounts": {
-                            "type": "array"
-                        },
-                        "extraEnvs": {
-                            "type": "object"
-                        },
-                        "securityContext": {
-                            "type": "object"
-                        }
-                    }
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Arguments to pass to the metrics exporter container"
                 },
-                "service": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "type": {
-                            "type": "string"
-                        },
-                        "ports": {
-                            "type": "object"
-                        },
-                        "annotations": {
-                            "type": "object"
-                        },
-                        "extraLabels": {
-                            "type": "object"
-                        }
-                    }
+                "port": {
+                  "type": "integer",
+                  "default": 9121,
+                  "description": "Port on which the metrics exporter will listen"
                 },
-                "serviceMonitor": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "port": {
-                            "type": "string"
-                        },
-                        "extraLabels": {
-                            "type": "object"
-                        },
-                        "annotations": {
-                            "type": "object"
-                        },
-                        "interval": {
-                            "type": "string"
-                        },
-                        "scrapeTimeout": {
-                            "type": "string"
-                        },
-                        "relabelings": {
-                            "type": "array"
-                        },
-                        "metricRelabelings": {
-                            "type": "array"
-                        },
-                        "honorLabels": {
-                            "type": "boolean"
-                        },
-                        "additionalLabels": {
-                            "type": "object"
-                        },
-                        "podTargetLabels": {
-                            "type": "array"
-                        },
-                        "sampleLimit": {
-                            "type": "boolean"
-                        },
-                        "targetLimit": {
-                            "type": "boolean"
-                        }
+                "image": {
+                  "type": "object",
+                  "description": "Image configuration",
+                  "properties": {
+                    "repository": {
+                      "type": "string",
+                      "default": "ghcr.io/oliver006/redis_exporter",
+                      "description": "Prometheus exporter Docker image"
+                    },
+                    "pullPolicy": {
+                      "type": "string",
+                      "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                      ],
+                      "default": "IfNotPresent",
+                      "description": "Image pull policy (Always, IfNotPresent, Never)"
+                    },
+                    "tag": {
+                      "type": "string",
+                      "default": "v1.79.0",
+                      "description": "Image tag (leave empty to use latest)"
                     }
+                  }
                 },
-                "podMonitor": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "port": {
-                            "type": "string"
-                        },
-                        "extraLabels": {
-                            "type": "object"
-                        },
-                        "annotations": {
-                            "type": "object"
-                        },
-                        "interval": {
-                            "type": "string"
-                        },
-                        "scrapeTimeout": {
-                            "type": "string"
-                        },
-                        "relabelings": {
-                            "type": "array"
-                        },
-                        "metricRelabelings": {
-                            "type": "array"
-                        },
-                        "honorLabels": {
-                            "type": "boolean"
-                        },
-                        "additionalLabels": {
-                            "type": "object"
-                        },
-                        "podTargetLabels": {
-                            "type": "array"
-                        },
-                        "sampleLimit": {
-                            "type": "boolean"
-                        },
-                        "targetLimit": {
-                            "type": "boolean"
-                        }
-                    }
+                "resources": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Resource limits/requests for the metrics exporter container"
                 },
-                "prometheusRule": {
-                    "type": "object",
-                    "properties": {
-                        "enabled": {
-                            "type": "boolean"
-                        },
-                        "extraLabels": {
-                            "type": "object"
-                        },
-                        "extraAnnotations": {
-                            "type": "object"
-                        },
-                        "rules": {
-                            "type": "array"
-                        }
-                    }
+                "extraVolumeMounts": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Extra volume mounts for metrics exporter container"
+                },
+                "extraEnvs": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Environment variables to inject into the metrics exporter container"
+                },
+                "securityContext": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Security context for the metrics exporter container"
                 }
+              }
+            },
+            "service": {
+              "type": "object",
+              "description": "Service configuration for the metrics exporter",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable a separate service for the metrics exporter"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ],
+                  "default": "ClusterIP",
+                  "description": "Service type (ClusterIP, NodePort, LoadBalancer)"
+                },
+                "ports": {
+                  "type": "object",
+                  "description": "Port on which the metrics exporter service will be exposed",
+                  "properties": {
+                    "http": {
+                      "type": "integer",
+                      "default": 9121
+                    }
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Optional annotations for the metrics exporter service"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Optional labels for the metrics exporter service"
+                }
+              }
+            },
+            "serviceMonitor": {
+              "type": "object",
+              "description": "ServiceMonitor configuration for Prometheus Operator",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable ServiceMonitor resource for scraping service metrics"
+                },
+                "port": {
+                  "type": "string",
+                  "default": "metrics",
+                  "description": "Port name or number to scrape metrics from"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels for the ServiceMonitor resource"
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations for the ServiceMonitor resource"
+                },
+                "interval": {
+                  "type": "string",
+                  "default": "30s",
+                  "description": "How often Prometheus should scrape metrics"
+                },
+                "scrapeTimeout": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Maximum duration allowed for a scrape request"
+                },
+                "relabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules applied before scraping metrics"
+                },
+                "metricRelabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules applied before ingesting metrics"
+                },
+                "honorLabels": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Set honorLabels to true to preserve original metric labels"
+                },
+                "additionalLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels to help Prometheus discover ServiceMonitor resources"
+                },
+                "podTargetLabels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Pod labels to copy onto the generated metrics"
+                },
+                "sampleLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of samples to collect per Pod scrape"
+                },
+                "targetLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of scrape targets allowed"
+                }
+              }
+            },
+            "podMonitor": {
+              "type": "object",
+              "description": "PodMonitor configuration for Prometheus Operator",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable PodMonitor resource for scraping pod metrics"
+                },
+                "port": {
+                  "type": "string",
+                  "default": "metrics",
+                  "description": "Port name or number to scrape metrics from"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels for the PodMonitor resource"
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations for the PodMonitor resource"
+                },
+                "interval": {
+                  "type": "string",
+                  "default": "30s",
+                  "description": "Frequency for Prometheus to scrape pod metrics"
+                },
+                "scrapeTimeout": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Time limit for each scrape operation"
+                },
+                "relabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules to apply before scraping pod metrics"
+                },
+                "metricRelabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules to apply before ingesting pod metrics"
+                },
+                "honorLabels": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "If true, keeps original labels from the pod metrics"
+                },
+                "additionalLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Additional labels for Prometheus to find PodMonitor resources"
+                },
+                "podTargetLabels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Pod labels to attach to the metrics"
+                },
+                "sampleLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum samples to scrape from each Pod"
+                },
+                "targetLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of pods to scrape"
+                }
+              }
+            },
+            "prometheusRule": {
+              "type": "object",
+              "description": "PrometheusRule configuration for alerting rules (used by kube-prometheus-stack)",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable creation of PrometheusRule resource"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels to add to the PrometheusRule resource"
+                },
+                "extraAnnotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations to add to the PrometheusRule resource"
+                },
+                "rules": {
+                  "type": "array",
+                  "default": [],
+                  "description": "List of Prometheus alerting rules"
+                }
+              }
             }
-        },
-        "env": {
-            "type": "object",
-            "description": "Environment variables to inject into Valkey container"
+          }
         }
+      }
+    },
+    "sentinel": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of Sentinel pods to run (overrides global replicaCount for Sentinel)"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Sentinel port"
+        },
+        "quorum": {
+          "type": "integer",
+          "minimum": 2,
+          "description": "Quorum: number of Sentinels that must agree primary is down"
+        },
+        "downAfterMilliseconds": {
+          "type": "integer",
+          "description": "Time before instance considered down (milliseconds)"
+        },
+        "failoverTimeout": {
+          "type": "integer",
+          "description": "Failover timeout in milliseconds"
+        },
+        "parallelSyncs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of replicas syncing simultaneously during failover"
+        },
+        "announce": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable announce configuration"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource limits/requests for the Sentinel container"
+        },
+        "extraSecrets": {
+          "type": "array",
+          "description": "Mount additional secrets into the Sentinel container"
+        },
+        "extraConfigs": {
+          "type": "array",
+          "description": "Mount additional configMaps into the Sentinel container"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable Prometheus exporter sidecar"
+            },
+            "exporter": {
+              "type": "object",
+              "description": "Exporter configuration",
+              "properties": {
+                "command": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Command to run in the metrics exporter container (overrides args)"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Arguments to pass to the metrics exporter container"
+                },
+                "port": {
+                  "type": "integer",
+                  "default": 9121,
+                  "description": "Port on which the metrics exporter will listen"
+                },
+                "image": {
+                  "type": "object",
+                  "description": "Image configuration",
+                  "properties": {
+                    "repository": {
+                      "type": "string",
+                      "default": "ghcr.io/oliver006/redis_exporter",
+                      "description": "Prometheus exporter Docker image"
+                    },
+                    "pullPolicy": {
+                      "type": "string",
+                      "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                      ],
+                      "default": "IfNotPresent",
+                      "description": "Image pull policy (Always, IfNotPresent, Never)"
+                    },
+                    "tag": {
+                      "type": "string",
+                      "default": "v1.79.0",
+                      "description": "Image tag (leave empty to use latest)"
+                    }
+                  }
+                },
+                "resources": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Resource limits/requests for the metrics exporter container"
+                },
+                "extraVolumeMounts": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Extra volume mounts for metrics exporter container"
+                },
+                "extraEnvs": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Environment variables to inject into the metrics exporter container"
+                },
+                "securityContext": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Security context for the metrics exporter container"
+                }
+              }
+            },
+            "service": {
+              "type": "object",
+              "description": "Service configuration for the metrics exporter",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable a separate service for the metrics exporter"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "ClusterIP",
+                    "NodePort",
+                    "LoadBalancer"
+                  ],
+                  "default": "ClusterIP",
+                  "description": "Service type (ClusterIP, NodePort, LoadBalancer)"
+                },
+                "ports": {
+                  "type": "object",
+                  "description": "Port on which the metrics exporter service will be exposed",
+                  "properties": {
+                    "http": {
+                      "type": "integer",
+                      "default": 9121
+                    }
+                  }
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Optional annotations for the metrics exporter service"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Optional labels for the metrics exporter service"
+                }
+              }
+            },
+            "serviceMonitor": {
+              "type": "object",
+              "description": "ServiceMonitor configuration for Prometheus Operator",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable ServiceMonitor resource for scraping service metrics"
+                },
+                "port": {
+                  "type": "string",
+                  "default": "metrics",
+                  "description": "Port name or number to scrape metrics from"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels for the ServiceMonitor resource"
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations for the ServiceMonitor resource"
+                },
+                "interval": {
+                  "type": "string",
+                  "default": "30s",
+                  "description": "How often Prometheus should scrape metrics"
+                },
+                "scrapeTimeout": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Maximum duration allowed for a scrape request"
+                },
+                "relabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules applied before scraping metrics"
+                },
+                "metricRelabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules applied before ingesting metrics"
+                },
+                "honorLabels": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Set honorLabels to true to preserve original metric labels"
+                },
+                "additionalLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels to help Prometheus discover ServiceMonitor resources"
+                },
+                "podTargetLabels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Pod labels to copy onto the generated metrics"
+                },
+                "sampleLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of samples to collect per Pod scrape"
+                },
+                "targetLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of scrape targets allowed"
+                }
+              }
+            },
+            "podMonitor": {
+              "type": "object",
+              "description": "PodMonitor configuration for Prometheus Operator",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable PodMonitor resource for scraping pod metrics"
+                },
+                "port": {
+                  "type": "string",
+                  "default": "metrics",
+                  "description": "Port name or number to scrape metrics from"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels for the PodMonitor resource"
+                },
+                "annotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations for the PodMonitor resource"
+                },
+                "interval": {
+                  "type": "string",
+                  "default": "30s",
+                  "description": "Frequency for Prometheus to scrape pod metrics"
+                },
+                "scrapeTimeout": {
+                  "type": "string",
+                  "default": "",
+                  "description": "Time limit for each scrape operation"
+                },
+                "relabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules to apply before scraping pod metrics"
+                },
+                "metricRelabelings": {
+                  "type": "array",
+                  "default": [],
+                  "description": "Relabeling rules to apply before ingesting pod metrics"
+                },
+                "honorLabels": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "If true, keeps original labels from the pod metrics"
+                },
+                "additionalLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Additional labels for Prometheus to find PodMonitor resources"
+                },
+                "podTargetLabels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [],
+                  "description": "Pod labels to attach to the metrics"
+                },
+                "sampleLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum samples to scrape from each Pod"
+                },
+                "targetLimit": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Maximum number of pods to scrape"
+                }
+              }
+            },
+            "prometheusRule": {
+              "type": "object",
+              "description": "PrometheusRule configuration for alerting rules (used by kube-prometheus-stack)",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable creation of PrometheusRule resource"
+                },
+                "extraLabels": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra labels to add to the PrometheusRule resource"
+                },
+                "extraAnnotations": {
+                  "type": "object",
+                  "default": {},
+                  "description": "Extra annotations to add to the PrometheusRule resource"
+                },
+                "rules": {
+                  "type": "array",
+                  "default": [],
+                  "description": "List of Prometheus alerting rules"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the default name of resources"
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full name of resources"
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "description": "Create a service account for Valkey"
+        },
+        "automount": {
+          "type": "boolean",
+          "description": "Whether to automount the service account token"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations to add to the service account"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of an existing service account to use (if create: false)"
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "description": "Annotations for the pods"
+    },
+    "podLabels": {
+      "type": "object",
+      "description": "Labels for the pods"
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "properties": {
+        "fsGroup": {
+          "type": "integer",
+          "description": "File system group ID"
+        },
+        "runAsUser": {
+          "type": "integer",
+          "description": "User ID to run containers as"
+        },
+        "runAsGroup": {
+          "type": "integer",
+          "description": "Group ID to run containers as"
+        }
+      },
+      "description": "Security context for the pod (applies to all containers)"
+    },
+    "securityContext": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Capabilities to drop"
+            }
+          }
+        },
+        "readOnlyRootFilesystem": {
+          "type": "boolean",
+          "description": "Mount root filesystem as read-only"
+        },
+        "runAsNonRoot": {
+          "type": "boolean",
+          "description": "Run as non-root user"
+        },
+        "runAsUser": {
+          "type": "integer",
+          "description": "User ID to run container as"
+        }
+      },
+      "description": "Security context for the Valkey containers"
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ],
+          "description": "Type of Kubernetes service (ClusterIP, NodePort, LoadBalancer)"
+        },
+        "port": {
+          "type": "integer",
+          "description": "Port on which Valkey will be exposed"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations for the service"
+        },
+        "nodePort": {
+          "type": "integer",
+          "description": "NodePort value (if service.type is NodePort)"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the ClusterIP service for load-balanced client connections. A headless service is always created for StatefulSet DNS (this setting does not affect it)"
+        }
+      }
+    },
+    "dataStorage": {
+      "type": "object",
+      "description": "Persistent storage configuration for Valkey data (only applies to Valkey pods, not Sentinel pods)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable persistent volume claim creation"
+        },
+        "requestedSize": {
+          "type": "string",
+          "description": "Storage size (e.g., 8Gi for production workloads)"
+        },
+        "className": {
+          "type": "string",
+          "description": "Storage class name (leave empty for default)"
+        },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Access modes for the PVC"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Optional annotations to add to the PVC"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Optional labels to add to the PVC"
+        },
+        "volumeName": {
+          "type": "string",
+          "default": "data",
+          "description": "Volume name to use for mounting data"
+        },
+        "subPath": {
+          "type": "string",
+          "description": "Optional subPath for the volume mount"
+        },
+        "persistentVolumeClaimName": {
+          "type": "string",
+          "description": "Use an existing PVC instead of creating a new one"
+        },
+        "keepPvc": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep PVC when uninstalling (adds helm.sh/resource-policy: keep annotation)"
+        }
+      }
+    },
+    "nodeSelector": {
+      "type": "object",
+      "description": "Node selector for pod assignment"
+    },
+    "tolerations": {
+      "type": "array",
+      "description": "Tolerations for pod assignment to tainted nodes"
+    },
+    "affinity": {
+      "type": "object",
+      "description": "Affinity rules for pod scheduling"
+    },
+    "deploymentStrategy": {
+      "type": "string",
+      "enum": [
+        "RollingUpdate",
+        "Recreate"
+      ],
+      "description": "Set Deployment strategy"
+    },
+    "topologySpreadConstraints": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Topology spread constraints for pod scheduling"
+    },
+    "extraInitContainers": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Additional init containers to run before Valkey starts"
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables to inject into Valkey container"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "description": "Network policy to control traffic to/from the Valkey pods. Since Valkey and Sentinel run in the same pods (sidecar pattern), one policy applies to both."
+    },
+    "auth": {
+      "type": "object",
+      "description": "Authentication configuration (applies to both Valkey and Sentinel)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable authentication. When false, authentication is completely disabled (equivalent to method: none). When true, uses the authentication method specified below."
+        },
+        "acl": {
+          "type": "object",
+          "description": "ACL-based authentication configuration",
+          "properties": {
+            "password": {
+              "type": "string",
+              "description": "Single password for simple setup (creates both default and sentinel users)"
+            },
+            "defaultUserPassword": {
+              "type": "string",
+              "description": "Password for the default user (application access)"
+            },
+            "sentinelUserPassword": {
+              "type": "string",
+              "description": "Password for the sentinel user (management access)"
+            },
+            "existingSecret": {
+              "type": "string",
+              "description": "Name of existing secret containing ACL passwords"
+            },
+            "existingSecretDefaultUserKey": {
+              "type": "string",
+              "description": "Key in secret for default user password"
+            },
+            "existingSecretSentinelUserKey": {
+              "type": "string",
+              "description": "Key in secret for sentinel user password"
+            },
+            "config": {
+              "type": "string",
+              "description": "Full custom ACL configuration"
+            }
+          }
+        }
+      }
+    },
+    "initSecurityContext": {
+      "type": "object",
+      "description": "Security context for init containers (should not include readOnlyRootFilesystem since init containers write configs)",
+      "properties": {
+        "runAsNonRoot": {
+          "type": "boolean"
+        },
+        "runAsUser": {
+          "type": "integer"
+        },
+        "runAsGroup": {
+          "type": "integer"
+        },
+        "capabilities": {
+          "type": "object",
+          "properties": {
+            "drop": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
     }
+  }
 }

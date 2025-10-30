@@ -1,4 +1,4 @@
-{{- if and .Values.metrics.enabled .Values.metrics.prometheusRule.enabled }}
+{{- if and .Values.valkey.metrics.enabled .Values.valkey.metrics.prometheusRule.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -6,15 +6,15 @@ metadata:
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
     app.kubernetes.io/part-of: valkey
-    {{- if .Values.metrics.prometheusRule.extraLabels }}
-    {{- toYaml .Values.metrics.prometheusRule.extraLabels | nindent 4 }}
+    {{- if .Values.valkey.metrics.prometheusRule.extraLabels }}
+    {{- toYaml .Values.valkey.metrics.prometheusRule.extraLabels | nindent 4 }}
     {{- end }}
-  {{- with .Values.metrics.prometheusRule.extraAnnotations }}
+  {{- with .Values.valkey.metrics.prometheusRule.extraAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-{{- with .Values.metrics.prometheusRule.rules }}
+{{- with .Values.valkey.metrics.prometheusRule.rules }}
   groups:
     - name: {{ include "valkey.fullname" $ }}
       rules: {{ tpl (toYaml .) $ | nindent 8 }}

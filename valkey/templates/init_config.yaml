@@ -43,10 +43,10 @@ data:
       echo "dir /data"
     } >>"$VALKEY_CONFIG"
 
-    {{- if .Values.valkey.auth.enabled }}
+    {{- if .Values.auth.enabled }}
     echo "aclfile /data/conf/users.acl" >>"$VALKEY_CONFIG"
     cat <<EOF > /data/conf/users.acl
-{{ .Values.auth.aclConfig | indent 6 }}
+{{ .Values.auth.acl.config | indent 6 }}
     EOF
     {{- end }}
 
