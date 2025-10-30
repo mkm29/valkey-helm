@@ -1,0 +1,23 @@
+{{- if .Values.auth.enabled }}
+{{- if and (or .Values.auth.acl.password .Values.auth.acl.defaultUserPassword .Values.auth.acl.sentinelUserPassword) (not .Values.auth.acl.existingSecret) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "valkey.fullname" . }}-auth
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+type: Opaque
+stringData:
+  {{- if .Values.auth.acl.password }}
+  password: {{ .Values.auth.acl.password | quote }}
+  {{- else }}
+  {{- if .Values.auth.acl.defaultUserPassword }}
+  default-password: {{ .Values.auth.acl.defaultUserPassword | quote }}
+  {{- end }}
+  {{- if .Values.auth.acl.sentinelUserPassword }}
+  sentinel-password: {{ .Values.auth.acl.sentinelUserPassword | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

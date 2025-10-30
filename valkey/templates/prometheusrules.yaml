@@ -1,4 +1,6 @@
-{{- if and .Values.metrics.enabled .Values.metrics.prometheusRule.enabled }}
+{{- $valkeyEnabled := and .Values.valkey.metrics.enabled .Values.valkey.metrics.prometheusRule.enabled }}
+{{- $sentinelEnabled := and (eq .Values.config.mode "sentinel") .Values.sentinel.metrics.enabled .Values.sentinel.metrics.prometheusRule.enabled }}
+{{- if or $valkeyEnabled $sentinelEnabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -6,17 +8,38 @@ metadata:
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
     app.kubernetes.io/part-of: valkey
-    {{- if .Values.metrics.prometheusRule.extraLabels }}
-    {{- toYaml .Values.metrics.prometheusRule.extraLabels | nindent 4 }}
+    {{- if $valkeyEnabled }}
+    {{- with .Values.valkey.metrics.prometheusRule.extraLabels }}
+    {{- toYaml . | nindent 4 }}
     {{- end }}
-  {{- with .Values.metrics.prometheusRule.extraAnnotations }}
+    {{- else if $sentinelEnabled }}
+    {{- with .Values.sentinel.metrics.prometheusRule.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+  {{- if $valkeyEnabled }}
+  {{- with .Values.valkey.metrics.prometheusRule.extraAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- else if $sentinelEnabled }}
+  {{- with .Values.sentinel.metrics.prometheusRule.extraAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- end }}
 spec:
-{{- with .Values.metrics.prometheusRule.rules }}
   groups:
-    - name: {{ include "valkey.fullname" $ }}
+{{- if $valkeyEnabled }}
+{{- with .Values.valkey.metrics.prometheusRule.rules }}
+    - name: {{ include "valkey.fullname" $ }}-valkey
       rules: {{ tpl (toYaml .) $ | nindent 8 }}
+{{- end }}
+{{- end }}
+{{- if $sentinelEnabled }}
+{{- with .Values.sentinel.metrics.prometheusRule.rules }}
+    - name: {{ include "valkey.fullname" $ }}-sentinel
+      rules: {{ tpl (toYaml .) $ | nindent 8 }}
+{{- end }}
 {{- end }}
 {{- end }}

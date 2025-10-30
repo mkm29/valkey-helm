@@ -1,0 +1,402 @@
+{{- include "valkey.validateMode" . }}
+{{- include "valkey.validateAuth" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "valkey.fullname" . }}
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    {{- if eq .Values.config.mode "sentinel" }}
+    app.kubernetes.io/component: valkey
+    {{- end }}
+spec:
+  serviceName: {{ include "valkey.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "valkey.selectorLabels" . | nindent 6 }}
+      {{- if eq .Values.config.mode "sentinel" }}
+      app.kubernetes.io/component: valkey
+      {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "valkey.selectorLabels" . | nindent 8 }}
+        {{- if eq .Values.config.mode "sentinel" }}
+        app.kubernetes.io/component: valkey
+        {{- end }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      serviceAccountName: {{ include "valkey.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.valkey.nodeSelector | default .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.valkey.affinity | default .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.valkey.tolerations | default .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: init-valkey
+          image: "{{ include "valkey.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.initSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if eq .Values.config.mode "sentinel" }}
+          command: ["/bin/bash", "/scripts/init-valkey.sh"]
+          {{- else }}
+          command: ["/bin/bash", "/scripts/init.sh"]
+          {{- end }}
+          {{- $env := .Values.env }}
+          {{- if $env }}
+          env:
+            {{- range $key, $value := $env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: init-scripts
+              mountPath: /scripts
+            - name: valkey-base-config
+              mountPath: /config-base
+            {{- if eq .Values.auth.method "acl" }}
+            {{- if .Values.auth.acl.existingSecret }}
+            - name: valkey-password
+              mountPath: /secrets
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.initResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- if eq .Values.config.mode "sentinel" }}
+        - name: init-sentinel
+          image: "{{ include "valkey.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.initSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["/bin/bash", "/scripts/init-sentinel.sh"]
+          {{- $env := .Values.env }}
+          {{- if $env }}
+          env:
+            {{- range $key, $value := $env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: init-scripts
+              mountPath: /scripts
+            - name: sentinel-base-config
+              mountPath: /config-base
+            {{- if eq .Values.auth.method "acl" }}
+            {{- if .Values.auth.acl.existingSecret }}
+            - name: valkey-password
+              mountPath: /secrets
+              readOnly: true
+            {{- end }}
+            {{- end }}
+          {{- with .Values.initResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.extraInitContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: valkey
+          image: "{{ include "valkey.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - valkey-server
+            - /data/valkey.conf
+          ports:
+            - name: tcp
+              containerPort: 6379
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: tcp
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - valkey-cli ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          {{- $env := .Values.env }}
+          {{- if $env }}
+          env:
+            {{- range $key, $value := $env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            {{- with .Values.valkey.extraConfigs }}
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              {{- if .defaultMode }}
+              defaultMode: {{ .defaultMode }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.valkey.extraSecrets }}
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+              {{- if .defaultMode }}
+              defaultMode: {{ .defaultMode }}
+              {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- $resources := .Values.valkey.resources }}
+          {{- if $resources }}
+          resources:
+            {{- toYaml $resources | nindent 12 }}
+          {{- end }}
+        {{- if eq .Values.config.mode "sentinel" }}
+        - name: sentinel
+          image: "{{ include "valkey.image" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - valkey-sentinel
+            - /data/sentinel.conf
+          ports:
+            - name: sentinel
+              containerPort: 26379
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: sentinel
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - valkey-cli -p 26379 ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          {{- $env := .Values.env }}
+          {{- if $env }}
+          env:
+            {{- range $key, $value := $env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- with .Values.sentinel.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.valkey.metrics.enabled }}
+        - name: metrics
+          image: "{{ .Values.valkey.metrics.exporter.image.repository | default "oliver006/redis_exporter" }}:{{ .Values.valkey.metrics.exporter.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.valkey.metrics.exporter.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: metrics
+              containerPort: 9121
+              protocol: TCP
+          env:
+            - name: REDIS_ADDR
+              value: "redis://localhost:6379"
+            {{- if .Values.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.auth.acl.existingSecret }}
+                  name: {{ .Values.auth.acl.existingSecret }}
+                  key: {{ .Values.auth.acl.existingSecretDefaultUserKey | default "default-password" }}
+                  {{- else }}
+                  name: {{ include "valkey.fullname" . }}-auth
+                  key: {{ if .Values.auth.acl.password }}password{{ else }}default-password{{ end }}
+                  {{- end }}
+            {{- end }}
+          {{- with .Values.valkey.metrics.exporter.extraExporterSecrets }}
+          volumeMounts:
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
+          {{- with .Values.valkey.metrics.exporter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- if and (eq .Values.config.mode "sentinel") .Values.sentinel.metrics.enabled }}
+        - name: metrics-sentinel
+          image: "{{ .Values.sentinel.metrics.exporter.image.repository | default "oliver006/redis_exporter" }}:{{ .Values.sentinel.metrics.exporter.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.sentinel.metrics.exporter.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: metrics-sntl
+              containerPort: 9122
+              protocol: TCP
+          env:
+            - name: REDIS_EXPORTER_WEB_LISTEN_ADDRESS
+              value: ":9122"
+            - name: REDIS_ADDR
+              value: "redis://localhost:26379"
+            {{- if .Values.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.auth.acl.existingSecret }}
+                  name: {{ .Values.auth.acl.existingSecret }}
+                  key: {{ .Values.auth.acl.existingSecretSentinelUserKey | default "sentinel-password" }}
+                  {{- else }}
+                  name: {{ include "valkey.fullname" . }}-auth
+                  key: {{ if .Values.auth.acl.password }}password{{ else }}sentinel-password{{ end }}
+                  {{- end }}
+            {{- end }}
+          {{- with .Values.sentinel.metrics.exporter.extraExporterSecrets }}
+          volumeMounts:
+            {{- range . }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              readOnly: true
+            {{- end }}
+          {{- end }}
+          {{- with .Values.sentinel.metrics.exporter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- with .Values.extraContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+            defaultMode: 0755
+        - name: valkey-base-config
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+        - name: sentinel-base-config
+          configMap:
+            name: {{ include "valkey.fullname" . }}-config
+        {{- if eq .Values.auth.method "acl" }}
+        {{- if .Values.auth.acl.existingSecret }}
+        - name: valkey-password
+          secret:
+            secretName: {{ .Values.auth.acl.existingSecret }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.valkey.extraConfigs }}
+        {{- range . }}
+        - name: {{ .name }}
+          configMap:
+            name: {{ .name }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.valkey.extraSecrets }}
+        {{- range . }}
+        - name: {{ .name }}
+          secret:
+            secretName: {{ .name }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+  {{- if and .Values.dataStorage.enabled .Values.dataStorage.requestedSize }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        {{- with .Values.dataStorage.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.dataStorage.labels }}
+        labels:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.dataStorage.accessModes | nindent 10 }}
+        {{- if .Values.dataStorage.className }}
+        storageClassName: {{ .Values.dataStorage.className }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.dataStorage.requestedSize }}
+  {{- else }}
+        - name: data
+          emptyDir: {}
+  {{- end }}

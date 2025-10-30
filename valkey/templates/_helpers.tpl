@@ -62,42 +62,61 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Creating Image Pull Secrets
+Validate deployment mode settings
+Ensure replica count meets requirements for the selected mode
 */}}
-{{- define "imagePullSecret" }}
-{{- with .Values.imageCredentials }}
-{{- printf "{\"auths\":{\"%s\":{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\",\"auth\":\"%s\"}}}" .registry .username .password .email (printf "%s:%s" .username .password | b64enc) | b64enc }}
-{{- end }}
-{{- end }}
-
-{{- define "valkey.secretName" -}}
-{{- if .Values.imagePullSecrets.nameOverride }}
-{{- .Values.imagePullSecrets.nameOverride }}
-{{- else }}
-{{- printf "%s-regcred" .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-
-{{/*
-Determine the number of replicas for standalone mode
-Priority: valkey.replicaCount > global replicaCount
-*/}}
-{{- define "standalone.replicaCount" -}}
-{{- if .Values.valkey.replicaCount }}
-{{- .Values.valkey.replicaCount }}
-{{- else }}
-{{- .Values.replicaCount }}
-{{- end }}
-{{- end }}
+{{- define "valkey.validateMode" -}}
+{{- $replicaCount := .Values.replicaCount | int -}}
+{{- if eq .Values.config.mode "sentinel" -}}
+  {{- if lt $replicaCount 3 -}}
+    {{- fail (printf "ERROR: Sentinel mode requires at least 3 replicas for high availability. Current replicaCount is %d. Please set replicaCount to at least 3." $replicaCount) -}}
+  {{- end -}}
+  {{- $quorum := .Values.sentinel.quorum | int -}}
+  {{- if lt $quorum 2 -}}
+    {{- fail (printf "ERROR: Sentinel quorum must be at least 2 for meaningful consensus. Current quorum is %d. Please set sentinel.quorum to at least 2." $quorum) -}}
+  {{- end -}}
+  {{- if gt $quorum $replicaCount -}}
+    {{- fail (printf "ERROR: Sentinel quorum (%d) cannot exceed the number of replicas (%d). Quorum must be <= replicaCount. Please adjust sentinel.quorum or increase replicaCount." $quorum $replicaCount) -}}
+  {{- end -}}
+{{- else if eq .Values.config.mode "standalone" -}}
+  {{- if lt $replicaCount 1 -}}
+    {{- fail (printf "ERROR: Standalone mode requires at least 1 replica. Current replicaCount is %d. Please set replicaCount to at least 1." $replicaCount) -}}
+  {{- end -}}
+{{- else -}}
+  {{- fail (printf "ERROR: Invalid deployment mode '%s'. Must be either 'sentinel' or 'standalone'." .Values.config.mode) -}}
+{{- end -}}
+{{- end -}}
 
 {{/*
-Determine the number of replicas for sentinel mode
-Priority: sentinel.replicaCount > global replicaCount
+Validate authentication configuration
 */}}
-{{- define "sentinel.replicaCount" -}}
-{{- if .Values.sentinel.replicaCount }}
-{{- .Values.sentinel.replicaCount }}
-{{- else }}
-{{- .Values.replicaCount }}
-{{- end }}
-{{- end }}
+{{- define "valkey.validateAuth" -}}
+{{- if .Values.auth.enabled -}}
+  {{- $hasSimplePassword := .Values.auth.acl.password -}}
+  {{- $hasAdvancedPassword := or .Values.auth.acl.defaultUserPassword .Values.auth.acl.sentinelUserPassword -}}
+  {{- $hasSecret := .Values.auth.acl.existingSecret -}}
+  {{- $hasConfig := .Values.auth.acl.config -}}
+  {{- if and (not $hasSimplePassword) (not $hasAdvancedPassword) (not $hasSecret) (not $hasConfig) -}}
+    {{- fail "ERROR: When auth.enabled is true, you must provide either auth.acl.password, auth.acl.defaultUserPassword/sentinelUserPassword, auth.acl.existingSecret, or auth.acl.config." -}}
+  {{- end -}}
+  {{- if $hasSecret -}}
+    {{- if not .Values.auth.acl.existingSecretDefaultUserKey -}}
+      {{- fail "ERROR: When auth.acl.existingSecret is set, you must also provide auth.acl.existingSecretDefaultUserKey." -}}
+    {{- end -}}
+    {{- if not .Values.auth.acl.existingSecretSentinelUserKey -}}
+      {{- fail "ERROR: When auth.acl.existingSecret is set, you must also provide auth.acl.existingSecretSentinelUserKey." -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if and (eq .Values.config.mode "sentinel") (not $hasSimplePassword) (not .Values.auth.acl.sentinelUserPassword) (not $hasSecret) (not $hasConfig) -}}
+    {{- fail "ERROR: Sentinel mode with ACL authentication requires either auth.acl.password or auth.acl.sentinelUserPassword to be set for Sentinel to authenticate." -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Construct the image name with tag fallback to Chart.AppVersion
+*/}}
+{{- define "valkey.image" -}}
+{{- $tag := .Values.image.tag | default .Chart.AppVersion }}
+{{- printf "%s:%s" .Values.image.repository $tag }}
+{{- end -}}

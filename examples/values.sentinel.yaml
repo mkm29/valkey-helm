@@ -1,0 +1,22 @@
+config:
+  mode: sentinel
+
+replicaCount: 3
+
+auth:
+  enabled: true
+  acl:
+    defaultUserPassword: "defaultpassword"
+    sentinelUserPassword: "sentineluserpassword"
+
+sentinel:
+  metrics:
+    enabled: true
+
+valkey:
+  metrics:
+    enabled: true
+
+dataStorage:
+  enabled: true
+  requestedSize: 1Gi

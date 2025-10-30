@@ -1,0 +1,53 @@
+{{- if and .Values.valkey.metrics.enabled .Values.valkey.metrics.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "valkey.fullname" . }}-metrics-valkey
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics-valkey
+    {{- with .Values.valkey.metrics.service.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.valkey.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.valkey.metrics.service.type }}
+  ports:
+    - port: {{ .Values.valkey.metrics.service.ports.http }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "valkey.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+{{- end }}
+---
+{{- if and (eq .Values.config.mode "sentinel") .Values.sentinel.metrics.enabled .Values.sentinel.metrics.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "valkey.fullname" . }}-metrics-sentinel
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: metrics-sentinel
+    {{- with .Values.sentinel.metrics.service.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.sentinel.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sentinel.metrics.service.type }}
+  ports:
+    - port: {{ .Values.sentinel.metrics.service.ports.http }}
+      targetPort: metrics-sntl
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "valkey.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+{{- end }}

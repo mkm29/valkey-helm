@@ -1,4 +1,3 @@
-{{- if .Values.config.valkey }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,6 +5,241 @@ metadata:
   labels:
     {{- include "valkey.labels" . | nindent 4 }}
 data:
+  {{- if eq .Values.config.mode "sentinel" }}
   valkey.conf: |
-    {{- .Values.config.valkey | nindent 4 }}
-{{- end }}
+    port 6379
+    protected-mode no
+    bind 0.0.0.0
+    dir /data
+    {{- if .Values.auth.enabled }}
+    aclfile /data/users.acl
+    {{- end }}
+    # Split-brain prevention: primary requires connected replicas to accept writes
+    # These settings prevent data loss during network partitions
+    min-replicas-to-write 1
+    min-replicas-max-lag 10
+    {{- if .Values.config.valkey }}
+    {{ .Values.config.valkey | nindent 4 }}
+    {{- end }}
+
+  sentinel.conf: |
+    port 26379
+    dir /data
+    sentinel resolve-hostnames yes
+    sentinel monitor mymaster PRIMARY_HOST_PLACEHOLDER 6379 {{ .Values.sentinel.quorum }}
+    sentinel down-after-milliseconds mymaster {{ .Values.sentinel.downAfterMilliseconds }}
+    sentinel parallel-syncs mymaster {{ .Values.sentinel.parallelSyncs }}
+    sentinel failover-timeout mymaster {{ .Values.sentinel.failoverTimeout }}
+    {{- if .Values.auth.enabled }}
+    sentinel auth-user mymaster sentinel
+    {{- if .Values.auth.acl.password }}
+    sentinel auth-pass mymaster {{ .Values.auth.acl.password }}
+    {{- else if .Values.auth.acl.sentinelUserPassword }}
+    sentinel auth-pass mymaster {{ .Values.auth.acl.sentinelUserPassword }}
+    {{- else if .Values.auth.acl.existingSecret }}
+    sentinel auth-pass mymaster PLACEHOLDER_FROM_SECRET_{{ .Values.auth.acl.existingSecretSentinelUserKey }}
+    {{- end }}
+    {{- end }}
+    {{- if .Values.config.sentinel }}
+    {{ .Values.config.sentinel | nindent 4 }}
+    {{- end }}
+  {{- end }}
+
+  {{- if eq .Values.config.mode "standalone" }}
+  init.sh: |
+    #!/bin/sh
+    set -euo pipefail
+
+    # Default config paths
+    VALKEY_CONFIG=${VALKEY_CONFIG_PATH:-/data/valkey.conf}
+
+    LOGFILE="/data/init.log"
+    DATA_DIR="/data"
+
+    # Logging function
+    log() {
+      echo "$(date) $1" | tee -a "$LOGFILE"
+    }
+
+    # Clean old log if requested
+    if [ "${KEEP_OLD_LOGS:-false}" != "true" ]; then
+      rm -f "$LOGFILE"
+    fi
+
+    if [ -f "$LOGFILE" ]; then
+      log "Detected restart of this instance ($HOSTNAME)"
+    fi
+
+    log "Creating configuration in $DATA_DIR..."
+    mkdir -p "$DATA_DIR"
+    rm -f "$VALKEY_CONFIG"
+
+    # Base valkey.conf
+    log "Generating base valkey.conf"
+    {
+      echo "port 6379"
+      echo "protected-mode no"
+      echo "bind 0.0.0.0"
+      echo "dir /data"
+    } >>"$VALKEY_CONFIG"
+
+    {{- if .Values.auth.enabled }}
+    # ACL-based authentication
+    echo "aclfile /data/users.acl" >>"$VALKEY_CONFIG"
+    {{- if .Values.auth.acl.password }}
+    # Simple mode: single password for both users
+    cat <<EOF > /data/users.acl
+    user default on >{{ .Values.auth.acl.password }} ~* &* +@all -@admin -@dangerous
+    user sentinel on >{{ .Values.auth.acl.password }} ~* &* +@all
+    EOF
+    {{- else if or .Values.auth.acl.defaultUserPassword .Values.auth.acl.sentinelUserPassword }}
+    # Advanced mode: separate passwords for each user
+    cat <<EOF > /data/users.acl
+    user default on >{{ .Values.auth.acl.defaultUserPassword | default "changeme" }} ~* &* +@all -@admin -@dangerous
+    user sentinel on >{{ .Values.auth.acl.sentinelUserPassword | default "sentinelpass" }} ~* &* +@all
+    EOF
+    {{- else if .Values.auth.acl.existingSecret }}
+    # Using passwords from existing secret
+    DEFAULT_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretDefaultUserKey }})
+    SENTINEL_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretSentinelUserKey }})
+    cat <<EOF > /data/users.acl
+    user default on >\$DEFAULT_PASSWORD ~* &* +@all -@admin -@dangerous
+    user sentinel on >\$SENTINEL_PASSWORD ~* &* +@all
+    EOF
+    {{- else }}
+    # Using custom ACL config from values
+    cat <<EOF > /data/users.acl
+{{ .Values.auth.acl.config | indent 6 }}
+    EOF
+    {{- end }}
+    {{- end }}
+
+    # Append extra configs if present
+    if [ -f /usr/local/etc/valkey/valkey.conf ]; then
+      log "Appending /usr/local/etc/valkey/valkey.conf"
+      cat /usr/local/etc/valkey/valkey.conf >>"$VALKEY_CONFIG"
+    fi
+    if [ -d /extravalkeyconfigs ]; then
+      log "Appending files in /extravalkeyconfigs/"
+      cat /extravalkeyconfigs/* >>"$VALKEY_CONFIG"
+    fi
+  {{- end }}
+
+  {{- if eq .Values.config.mode "sentinel" }}
+  init-valkey.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    HOSTNAME=$(hostname)
+    POD_INDEX=${HOSTNAME##*-}
+    PRIMARY_HOST="{{ include "valkey.fullname" . }}-0.{{ include "valkey.fullname" . }}-headless"
+
+    echo "Initializing Valkey on $HOSTNAME (pod index: $POD_INDEX)"
+
+    # Copy base config
+    cp /config-base/valkey.conf /data/valkey.conf
+
+    {{- if .Values.auth.enabled }}
+    # Create ACL file
+    {{- if .Values.auth.acl.password }}
+    # Simple mode: single password for both users
+    cat <<EOF > /data/users.acl
+    user default on >{{ .Values.auth.acl.password }} ~* &* +@all -@admin -@dangerous
+    user sentinel on >{{ .Values.auth.acl.password }} ~* &* +@all
+    EOF
+    {{- else if or .Values.auth.acl.defaultUserPassword .Values.auth.acl.sentinelUserPassword }}
+    # Advanced mode: separate passwords for each user
+    cat <<EOF > /data/users.acl
+    user default on >{{ .Values.auth.acl.defaultUserPassword | default "changeme" }} ~* &* +@all -@admin -@dangerous
+    user sentinel on >{{ .Values.auth.acl.sentinelUserPassword | default "sentinelpass" }} ~* &* +@all
+    EOF
+    {{- else if .Values.auth.acl.existingSecret }}
+    # Using passwords from existing secret
+    DEFAULT_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretDefaultUserKey }})
+    SENTINEL_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretSentinelUserKey }})
+    cat <<EOF > /data/users.acl
+    user default on >\$DEFAULT_PASSWORD ~* &* +@all -@admin -@dangerous
+    user sentinel on >\$SENTINEL_PASSWORD ~* &* +@all
+    EOF
+    {{- else }}
+    # Using custom ACL config from values
+    cat <<'ACL_EOF' > /data/users.acl
+{{ .Values.auth.acl.config | indent 4 }}
+    ACL_EOF
+    {{- end }}
+    {{- end }}
+
+    # Determine role and configure replication
+    if [ "$POD_INDEX" = "0" ]; then
+      echo "Configured as INITIAL PRIMARY"
+    else
+      echo "Configured as REPLICA of $PRIMARY_HOST"
+      echo "replicaof $PRIMARY_HOST 6379" >> /data/valkey.conf
+      {{- if .Values.auth.enabled }}
+      # Replicas need to authenticate as the sentinel user (which has admin rights)
+      echo "masteruser sentinel" >> /data/valkey.conf
+      {{- if .Values.auth.acl.password }}
+      echo "masterauth {{ .Values.auth.acl.password }}" >> /data/valkey.conf
+      {{- else if .Values.auth.acl.sentinelUserPassword }}
+      echo "masterauth {{ .Values.auth.acl.sentinelUserPassword }}" >> /data/valkey.conf
+      {{- else if .Values.auth.acl.existingSecret }}
+      SENTINEL_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretSentinelUserKey }})
+      echo "masterauth $SENTINEL_PASSWORD" >> /data/valkey.conf
+      {{- end }}
+      {{- end }}
+    fi
+
+    # Kubernetes announcements
+    ANNOUNCE_IP=$(hostname -i)
+    cat <<EOF >> /data/valkey.conf
+    replica-announce-ip $ANNOUNCE_IP
+    replica-announce-port 6379
+    EOF
+
+    {{- if .Values.valkeyConfig }}
+    # Custom config
+    cat <<'CUSTOM_EOF' >> /data/valkey.conf
+    {{ .Values.valkeyConfig }}
+    CUSTOM_EOF
+    {{- end }}
+
+    echo "Valkey configuration complete"
+
+  init-sentinel.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    HOSTNAME=$(hostname)
+    PRIMARY_HOST="{{ include "valkey.fullname" . }}-0.{{ include "valkey.fullname" . }}-headless"
+
+    echo "Initializing Sentinel on $HOSTNAME"
+
+    # Copy base config
+    cp /config-base/sentinel.conf /data/sentinel.conf
+
+    # Configure primary hostname for monitoring
+    # No need to wait for DNS - sentinel resolve-hostnames handles runtime resolution
+    echo "Configuring Sentinel to monitor: $PRIMARY_HOST"
+    sed -i "s/PRIMARY_HOST_PLACEHOLDER/$PRIMARY_HOST/g" /data/sentinel.conf
+
+    {{- if .Values.auth.enabled }}
+    {{- if eq .Values.auth.method "acl" }}
+    {{- if .Values.auth.acl.existingSecret }}
+    # Replace password placeholder with actual password from secret
+    SENTINEL_PASSWORD=$(cat /secrets/{{ .Values.auth.acl.existingSecretSentinelUserKey }})
+    sed -i "s|PLACEHOLDER_FROM_SECRET_{{ .Values.auth.acl.existingSecretSentinelUserKey }}|$SENTINEL_PASSWORD|g" /data/sentinel.conf
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
+    {{- if .Values.sentinel.announce.enabled }}
+    # Kubernetes announcements (critical for Sentinel)
+    ANNOUNCE_IP=$(hostname -i)
+    cat <<EOF >> /data/sentinel.conf
+    sentinel announce-ip $ANNOUNCE_IP
+    sentinel announce-port 26379
+    EOF
+    {{- end }}
+
+    echo "Sentinel configuration complete"
+  {{- end }}

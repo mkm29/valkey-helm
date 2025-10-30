@@ -34,20 +34,25 @@ Port:         {{ .Values.service.port }}
    $ valkey-cli -h $NODE_IP -p $NODE_PORT PING
 {{ end }}
 
-{{ if .Values.valkey.auth.enabled }}
-🔐 Authentication is ENABLED (ACL)
-- Provide the username and password from `.auth.aclConfig`.
-- Default user:
+{{ if ne .Values.auth.method "none" }}
+🔐 Authentication is ENABLED ({{ .Values.auth.method }})
+{{- if eq .Values.auth.method "password" }}
+- Using legacy password authentication
   $ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }} -a <password> PING
-- Named user:
-  $ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }} --user <user> -a <password> PING
+{{- else if eq .Values.auth.method "acl" }}
+- Using ACL-based authentication
+- Default user:
+  $ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }} --user default -a <password> PING
+- Sentinel user:
+  $ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }} --user sentinel -a <password> PING
+{{- end }}
 {{ else }}
 🔓 Authentication is DISABLED
-- Enable with: `--set auth.enabled=true` and provide `.auth.aclConfig`.
+- Enable with: `--set auth.method=acl` and provide passwords via `auth.acl.password` or `auth.acl.existingSecret`.
 {{ end }}
 
 ✅ Quick test
-$ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }}{{ if .Values.valkey.auth.enabled }} --user <user> -a <password>{{ end }}
+$ valkey-cli -h {{ include "valkey.fullname" . }} -p {{ .Values.service.port }}{{ if ne .Values.auth.method "none" }} --user default -a <password>{{ end }}
 valkey> SET foo bar
 valkey> GET foo
 "bar"

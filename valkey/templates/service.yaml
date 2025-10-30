@@ -1,3 +1,53 @@
+---
+# Headless Service (required for StatefulSet DNS discovery)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "valkey.fullname" . }}-headless
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    {{- if eq .Values.config.mode "sentinel" }}
+    app.kubernetes.io/component: valkey
+    {{- end }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - port: 6379
+      targetPort: tcp
+      protocol: TCP
+      name: tcp
+    {{- if eq .Values.config.mode "sentinel" }}
+    - port: {{ .Values.sentinel.port }}
+      targetPort: sentinel
+      protocol: TCP
+      name: sentinel
+    {{- end }}
+    {{- if .Values.valkey.metrics.enabled }}
+    - port: 9121
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
+    {{- if and (eq .Values.config.mode "sentinel") .Values.sentinel.metrics.enabled }}
+    - port: 9122
+      targetPort: metrics-sntl
+      protocol: TCP
+      name: metrics-sntl
+    {{- end }}
+  selector:
+    {{- include "valkey.selectorLabels" . | nindent 4 }}
+    {{- if eq .Values.config.mode "sentinel" }}
+    app.kubernetes.io/component: valkey
+    {{- end }}
+---
+{{- if .Values.service.enabled }}
+# ClusterIP Service (for client connections)
 apiVersion: v1
 kind: Service
 metadata:
@@ -18,5 +68,46 @@ spec:
       {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
+    {{- if .Values.valkey.metrics.enabled }}
+    - port: 9121
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+    {{- end }}
   selector:
     {{- include "valkey.selectorLabels" . | nindent 4 }}
+    {{- if eq .Values.config.mode "sentinel" }}
+    app.kubernetes.io/component: valkey
+    {{- end }}
+{{- end }}
+{{- if eq .Values.config.mode "sentinel" }}
+---
+# Sentinel Service (for Sentinel client connections in Sentinel mode)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "valkey.fullname" . }}-sentinel
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sentinel
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.sentinel.port }}
+      targetPort: sentinel
+      protocol: TCP
+      name: sentinel
+    {{- if .Values.sentinel.metrics.enabled }}
+    - port: 9122
+      targetPort: metrics-sntl
+      protocol: TCP
+      name: metrics-sntl
+    {{- end }}
+  selector:
+    {{- include "valkey.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: valkey
+{{- end }}

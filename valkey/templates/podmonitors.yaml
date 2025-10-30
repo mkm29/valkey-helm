@@ -1,0 +1,109 @@
+{{- if and .Values.valkey.metrics.enabled .Values.valkey.metrics.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "valkey.fullname" . }}-valkey
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: valkey
+    app.kubernetes.io/component: podmonitor-valkey
+    {{- with .Values.valkey.metrics.podMonitor.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.valkey.metrics.podMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podMetricsEndpoints:
+    - port: {{ .Values.valkey.metrics.podMonitor.port }}
+      {{- with .Values.valkey.metrics.podMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.valkey.metrics.podMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.valkey.metrics.podMonitor.honorLabels }}
+      honorLabels: {{ . }}
+      {{- end }}
+      {{- with .Values.valkey.metrics.podMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.valkey.metrics.podMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- with .Values.valkey.metrics.podMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.valkey.metrics.podMonitor.sampleLimit -}}
+  sampleLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.valkey.metrics.podMonitor.targetLimit -}}
+  targetLimit: {{ . }}
+  {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "valkey.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: valkey
+{{- end }}
+---
+{{- if and (eq .Values.config.mode "sentinel") .Values.sentinel.metrics.enabled .Values.sentinel.metrics.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "valkey.fullname" . }}-sentinel
+  labels:
+    {{- include "valkey.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: valkey
+    app.kubernetes.io/component: podmonitor-sentinel
+    {{- with .Values.sentinel.metrics.podMonitor.extraLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.sentinel.metrics.podMonitor.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podMetricsEndpoints:
+    - port: {{ .Values.sentinel.metrics.podMonitor.port }}
+      {{- with .Values.sentinel.metrics.podMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.sentinel.metrics.podMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
+      {{- with .Values.sentinel.metrics.podMonitor.honorLabels }}
+      honorLabels: {{ . }}
+      {{- end }}
+      {{- with .Values.sentinel.metrics.podMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- with .Values.sentinel.metrics.podMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+  {{- with .Values.sentinel.metrics.podMonitor.podTargetLabels }}
+  podTargetLabels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.sentinel.metrics.podMonitor.sampleLimit -}}
+  sampleLimit: {{ . }}
+  {{- end }}
+  {{- with .Values.sentinel.metrics.podMonitor.targetLimit -}}
+  targetLimit: {{ . }}
+  {{- end }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "valkey.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sentinel
+{{- end }}
